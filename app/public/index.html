@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observability Lab | Control Deck</title>
+    <link rel="stylesheet" href="style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="cyber-overlay"></div>
+    <div class="background-effects">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <!-- LOGIN / SECURITY PORTAL -->
+    <main id="login-view" class="view active">
+        <div class="cyber-panel login-card">
+            <div class="panel-header">
+                <span class="panel-title">// SECURITY_GATE</span>
+                <span class="system-ping">GATE_READY</span>
+            </div>
+            <div class="login-branding">
+                <h1>Observability<span>Lab</span></h1>
+                <p>Telemetry & Observability Center</p>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" id="tab-login">Entrar</button>
+                <button class="tab-btn" id="tab-register">Registrar</button>
+            </div>
+
+            <form id="auth-form" class="cyber-form">
+                <div class="input-group">
+                    <label for="username">USUÁRIO</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">👤</span>
+                        <input type="text" id="username" placeholder="Nome de usuário" required autocomplete="off">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="password">SENHA DE ACESSO</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔑</span>
+                        <input type="password" id="password" placeholder="Chave de acesso" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary" id="auth-submit-btn">
+                    <span class="btn-text">CONECTAR AO DECK</span>
+                </button>
+            </form>
+            <div id="auth-message" class="message"></div>
+        </div>
+    </main>
+
+    <!-- DASHBOARD VIEW -->
+    <main id="dashboard-view" class="view">
+        <!-- Main Navigation Bar -->
+        <nav class="cyber-navbar">
+            <div class="logo">Observability <span>Lab</span> <span class="badge">v1.0</span></div>
+
+            <div class="system-status-container">
+                <span class="nav-status-label">ESTADO:</span>
+                <span class="status-pill online">
+                    <span class="pulse-dot"></span> SISTEMA_OPERACIONAL
+                </span>
+            </div>
+
+            <div class="nav-user">
+                <div class="user-badge">
+                    <span class="user-icon">👤</span>
+                    <span id="current-user-display">User</span>
+                </div>
+                <button id="logout-btn" class="btn-logout">Sair</button>
+            </div>
+        </nav>
+
+        <!-- TOP BAR: Horizontal Telemetry Panel (Full Width) -->
+        <section class="cyber-panel telemetry-section horizontal-telemetry">
+            <div class="panel-header">
+                <span class="panel-title">// TELEMETRIA_GERAL_DO_SISTEMA</span>
+                <span class="pulse-indicator glow-green">ONLINE</span>
+            </div>
+            <div class="telemetry-grid">
+                <!-- CPU -->
+                <div class="telemetry-widget">
+                    <div class="widget-info">
+                        <span class="widget-label">CARGA DE CPU</span>
+                        <span id="telemetry-cpu-val" class="widget-value text-green">4.5%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill bg-green" id="telemetry-cpu-bar" style="width: 4.5%"></div>
+                    </div>
+                </div>
+
+                <!-- Latency -->
+                <div class="telemetry-widget">
+                    <div class="widget-info">
+                        <span class="widget-label">LATÊNCIA DE RESPOSTA</span>
+                        <span id="telemetry-latency-val" class="widget-value text-orange">21 ms</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill bg-orange" id="telemetry-latency-bar" style="width: 15%"></div>
+                    </div>
+                </div>
+
+                <!-- Error Rate -->
+                <div class="telemetry-widget">
+                    <div class="widget-info">
+                        <span class="widget-label">TAXA DE ERROS HTTP</span>
+                        <span id="telemetry-error-val" class="widget-value text-blue">0.0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill bg-blue" id="telemetry-error-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2-COLUMN MAIN LAYOUT -->
+        <div class="dashboard-grid-2col">
+
+            <!-- LEFT COLUMN: Incident Simulator Deck -->
+            <section class="cyber-panel incidents-section">
+                <div class="panel-header">
+                    <span class="panel-title">// CONSOLE_DE_DISPARO_DE_INCIDENTES</span>
+                    <span class="pulse-indicator glow-orange">READY</span>
+                </div>
+                <div class="panel-content">
+                    <p class="section-desc">Gere gargalos artificiais para observar e testar a capacidade de alerta da
+                        stack (Prometheus / Grafana / Loki).</p>
+
+                    <div class="incident-grid-layout">
+                        <!-- HTTP 500 -->
+                        <div class="incident-card error">
+                            <div class="card-header">
+                                <span class="card-icon">🔥</span>
+                                <span class="card-tag tag-danger">ERRO HTTP</span>
+                            </div>
+                            <h3>Erro HTTP 500</h3>
+                            <p>Força erros HTTP 500 no Express e gera picos rápidos no gráfico de erros.</p>
+                            <button onclick="triggerIncident('erro')" class="btn-danger">GERAR ERRO 500</button>
+                        </div>
+
+                        <!-- CPU Spike -->
+                        <div class="incident-card cpu">
+                            <div class="card-header">
+                                <span class="card-icon">⚡</span>
+                                <span class="card-tag tag-warning">CPU SPIKE</span>
+                            </div>
+                            <h3>Sobrecarga de CPU</h3>
+                            <p>Instancia trabalhadores paralelos que travam o processador da máquina por 5s.</p>
+                            <button onclick="triggerIncident('cpu')" class="btn-warning">TRAVAR PROCESSADOR</button>
+                        </div>
+
+                        <!-- Delay -->
+                        <div class="incident-card delay">
+                            <div class="card-header">
+                                <span class="card-icon">⏳</span>
+                                <span class="card-tag tag-info">TIMEOUT</span>
+                            </div>
+                            <h3>Latência de Rede</h3>
+                            <p>Adiciona delay fixo de 10 segundos em todas as requisições recebidas.</p>
+                            <button onclick="triggerIncident('delay')" class="btn-info">SIMULAR LATÊNCIA</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT COLUMN: User CRUD & Stack Links (Vertical Stack) -->
+            <div class="right-stack flex-col">
+
+                <!-- CRUD User Database -->
+                <section class="cyber-panel crud-section">
+                    <div class="panel-header">
+                        <span class="panel-title">// BANCO_DE_DADOS_MEMÓRIA</span>
+                        <span class="db-count" id="db-user-count">0 USUÁRIOS</span>
+                    </div>
+                    <div class="panel-content flex-col">
+                        <div class="section-actions">
+                            <p class="section-desc">Controle local dos usuários registrados no sistema.</p>
+                            <button class="btn-secondary" onclick="loadUsers()">
+                                <span>🔄</span> Sincronizar
+                            </button>
+                        </div>
+
+                        <div class="table-container">
+                            <table id="users-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>IDENTIFICADOR</th>
+                                        <th style="text-align: right;">REMOVER</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-list">
+                                    <!-- Dynamic elements -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- External Monitoring Stack Links -->
+                <section class="cyber-panel service-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">// PORTAL_DE_MONITORAMENTO</span>
+                    </div>
+                    <div class="panel-content service-deck">
+                        <a href="http://localhost:3000" target="_blank" class="service-card grafana">
+                            <div class="service-icon">📊</div>
+                            <div class="service-details">
+                                <h4>Grafana Dashboard</h4>
+                                <p>Acesse o painel central de visualizações em tempo real.</p>
+                            </div>
+                            <span class="external-link-arrow">↗</span>
+                        </a>
+
+                        <a href="http://localhost:9090" target="_blank" class="service-card prometheus">
+                            <div class="service-icon">⚡</div>
+                            <div class="service-details">
+                                <h4>Prometheus Server</h4>
+                                <p>Veja as métricas brutas e as expressões de alertas.</p>
+                            </div>
+                            <span class="external-link-arrow">↗</span>
+                        </a>
+
+                        <a href="http://localhost:3100" target="_blank" class="service-card loki">
+                            <div class="service-icon">🪵</div>
+                            <div class="service-details">
+                                <h4>Grafana Loki</h4>
+                                <p>Consulte logs agregados e fluxos de auditoria.</p>
+                            </div>
+                            <span class="external-link-arrow">↗</span>
+                        </a>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Alerts -->
+    <div id="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
