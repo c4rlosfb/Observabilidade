@@ -3,11 +3,17 @@ const promClient = require('prom-client');
 const path = require('path');
 const { Worker } = require('worker_threads');
 const os = require('os');
+const { createLogger, requestLoggerMiddleware } = require('./logger');
 
 const app = express();
+const logger = createLogger('app');
+
 app.use(express.json());
 app.set('json spaces', 2); // Deixa o output do JSON formatado e com quebra de linha no curl
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ─── Middleware de Log Estruturado ──────────────────────────────────────────
+app.use(requestLoggerMiddleware(logger));
 
 // ─── Módulo de Catálogo (Produtos & Categorias) ───────────────────────────
 const catalogRouter = require('./catalog').router;
@@ -44,7 +50,7 @@ const httpRequestDurationSeconds = new promClient.Histogram({
     buckets: [0.1, 0.5, 1, 2, 5, 10, 15] // Buckets de tempo em segundos
 });
 
-// Middleware para contar requisições e medir latência
+// Middleware para contar requisições e medir latência (Prometheus)
 app.use((req, res, next) => {
     const startEpoch = Date.now();
     res.on('finish', () => {
@@ -79,33 +85,59 @@ let currentId = 1;
 app.post('/register', (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
-        console.error('[Erro] Falha ao registrar usuário: dados incompletos');
+        logger.error('Falha ao registrar usuário: dados incompletos', {
+            correlation_id: req.correlationId,
+            method: req.method,
+            route: req.path
+        });
         return res.status(400).json({ error: 'Dados incompletos' });
     }
     const user = { id: currentId++, username, password };
     users.push(user);
-    console.log(`[INFO] Usuário registrado com sucesso: ${username}`);
+    logger.info(`Usuário registrado com sucesso: ${username}`, {
+        correlation_id: req.correlationId,
+        method: req.method,
+        route: req.path,
+        user_id: user.id
+    });
     res.status(201).json({ id: user.id, username });
 });
 
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
-        console.error('[Erro] Falha ao efetuar login: dados incompletos');
+        logger.error('Falha ao efetuar login: dados incompletos', {
+            correlation_id: req.correlationId,
+            method: req.method,
+            route: req.path
+        });
         return res.status(400).json({ error: 'Dados incompletos' });
     }
     const user = users.find(u => u.username === username && u.password === password);
     if (user) {
-        console.log(`[INFO] Login efetuado com sucesso para o usuário: ${username}`);
+        logger.info(`Login efetuado com sucesso para o usuário: ${username}`, {
+            correlation_id: req.correlationId,
+            method: req.method,
+            route: req.path,
+            user_id: user.id
+        });
         res.status(200).json({ message: 'Login efetuado com sucesso' });
     } else {
-        console.error('[Erro] Login falhou para o usuário: ' + username);
+        logger.error('Login falhou para o usuário: ' + username, {
+            correlation_id: req.correlationId,
+            method: req.method,
+            route: req.path
+        });
         res.status(401).json({ error: 'Credenciais inválidas' });
     }
 });
 
 app.get('/users', (req, res) => {
-    console.log('[INFO] Listando usuários');
+    logger.info('Listando usuários', {
+        correlation_id: req.correlationId,
+        method: req.method,
+        route: req.path
+    });
     res.json(users.map(u => ({ id: u.id, username: u.username })));
 });
 
@@ -116,10 +148,19 @@ app.put('/users/:id', (req, res) => {
     if (user) {
         if (username) user.username = username;
         if (password) user.password = password;
-        console.log(`[INFO] Usuário ${id} atualizado com sucesso`);
+        logger.info(`Usuário ${id} atualizado com sucesso`, {
+            correlation_id: req.correlationId,
+            method: req.method,
+            route: req.path,
+            user_id: user.id
+        });
         res.json({ id: user.id, username: user.username });
     } else {
-        console.error(`[Erro] Falha ao atualizar: Usuário ${id} não encontrado`);
+        logger.error(`Falha ao atualizar: Usuário ${id} não encontrado`, {
+            correlation_id: req.correlationId,
+            method: req.method,
+            route: req.path
+        });
         res.status(404).json({ error: 'Usuário não encontrado' });
     }
 });
@@ -129,23 +170,42 @@ app.delete('/users/:id', (req, res) => {
     const index = users.findIndex(u => u.id == id);
     if (index !== -1) {
         users.splice(index, 1);
-        console.log(`[INFO] Usuário ${id} deletado com sucesso`);
+        logger.info(`Usuário ${id} deletado com sucesso`, {
+            correlation_id: req.correlationId,
+            method: req.method,
+            route: req.path,
+            user_id: parseInt(id, 10)
+        });
         res.status(204).send();
     } else {
-        console.error(`[Erro] Falha ao deletar: Usuário ${id} não encontrado`);
+        logger.error(`Falha ao deletar: Usuário ${id} não encontrado`, {
+            correlation_id: req.correlationId,
+            method: req.method,
+            route: req.path
+        });
         res.status(404).json({ error: 'Usuário não encontrado' });
     }
 });
 
 // Gatilhos de Incidentes
 app.get('/incidente-erro', (req, res) => {
-    console.error('[Erro] Simulação de incidente de alta taxa de erro disparada!');
+    const err = new Error('Simulação de incidente de alta taxa de erro');
+    logger.error('Simulação de incidente de alta taxa de erro disparada!', {
+        correlation_id: req.correlationId,
+        method: req.method,
+        route: req.path,
+        error: err
+    });
     res.status(500).json({ error: 'Internal Server Error Simulado' });
 });
 
 app.get('/incidente-cpu', (req, res) => {
     const numCores = os.cpus().length;
-    console.log(`[INFO] Iniciando simulação de pico de CPU em ${numCores} núcleos...`);
+    logger.info(`Iniciando simulação de pico de CPU em ${numCores} núcleos...`, {
+        correlation_id: req.correlationId,
+        method: req.method,
+        route: req.path
+    });
     
     let completedWorkers = 0;
     for (let i = 0; i < numCores; i++) {
@@ -153,7 +213,11 @@ app.get('/incidente-cpu', (req, res) => {
         worker.on('exit', () => {
             completedWorkers++;
             if (completedWorkers === numCores) {
-                console.log('[INFO] Simulação de pico de CPU finalizada.');
+                logger.info('Simulação de pico de CPU finalizada.', {
+                    correlation_id: req.correlationId,
+                    method: req.method,
+                    route: req.path
+                });
             }
         });
     }
@@ -161,9 +225,17 @@ app.get('/incidente-cpu', (req, res) => {
 });
 
 app.get('/incidente-delay', (req, res) => {
-    console.log('[INFO] Iniciando simulação de instabilidade (delay de 10s)...');
+    logger.info('Iniciando simulação de instabilidade (delay de 10s)...', {
+        correlation_id: req.correlationId,
+        method: req.method,
+        route: req.path
+    });
     setTimeout(() => {
-        console.log('[INFO] Resposta atrasada enviada.');
+        logger.info('Resposta atrasada enviada.', {
+            correlation_id: req.correlationId,
+            method: req.method,
+            route: req.path
+        });
         res.status(200).json({ message: 'Resposta com delay de 10 segundos' });
     }, 10000);
 });
@@ -171,5 +243,5 @@ app.get('/incidente-delay', (req, res) => {
 // Inicialização
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-    console.log(`[INFO] Aplicação rodando na porta ${PORT}`);
+    logger.info(`Aplicação rodando na porta ${PORT}`);
 });
