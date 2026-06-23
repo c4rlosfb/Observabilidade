@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Observability Lab | Control Deck</title>
+    <title>E-Commerce | Observability Lab</title>
     <link rel="stylesheet" href="style.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
@@ -18,7 +18,7 @@
         <div class="blob blob-2"></div>
     </div>
 
-    <!-- LOGIN / SECURITY PORTAL -->
+    <!-- =============== LOGIN / SECURITY PORTAL =============== -->
     <main id="login-view" class="view active">
         <div class="cyber-panel login-card">
             <div class="panel-header">
@@ -26,8 +26,8 @@
                 <span class="system-ping">GATE_READY</span>
             </div>
             <div class="login-branding">
-                <h1>Observability<span>Lab</span></h1>
-                <p>Telemetry & Observability Center</p>
+                <h1>E-Commerce<span>Lab</span></h1>
+                <p>Observability & Monitoring Platform</p>
             </div>
 
             <div class="tabs">
@@ -58,197 +58,243 @@
         </div>
     </main>
 
-    <!-- DASHBOARD VIEW -->
+    <!-- =============== DASHBOARD / E-COMMERCE =============== -->
     <main id="dashboard-view" class="view">
-        <!-- Main Navigation Bar -->
-        <nav class="cyber-navbar">
-            <div class="logo">Observability <span>Lab</span> <span class="badge">v1.0</span></div>
 
-            <div class="system-status-container">
-                <span class="nav-status-label">ESTADO:</span>
-                <span class="status-pill online">
-                    <span class="pulse-dot"></span> SISTEMA_OPERACIONAL
-                </span>
+        <!-- Navbar -->
+        <nav class="cyber-navbar">
+            <div class="logo">E-Commerce <span>Lab</span> <span class="badge">v1.0</span></div>
+
+            <div class="nav-links" id="nav-links">
+                <button class="nav-link active" data-page="catalog">📦 Catálogo</button>
+                <button class="nav-link" data-page="cart">🛒 Carrinho <span id="cart-badge" class="cart-badge hidden">0</span></button>
+                <button class="nav-link" data-page="orders">📋 Pedidos</button>
+                <button class="nav-link" data-page="admin">⚙️ Admin</button>
             </div>
 
             <div class="nav-user">
                 <div class="user-badge">
                     <span class="user-icon">👤</span>
                     <span id="current-user-display">User</span>
+                    <span class="user-id-badge" id="user-id-badge"></span>
                 </div>
                 <button id="logout-btn" class="btn-logout">Sair</button>
             </div>
         </nav>
 
-        <!-- TOP BAR: Horizontal Telemetry Panel (Full Width) -->
-        <section class="cyber-panel telemetry-section horizontal-telemetry">
-            <div class="panel-header">
-                <span class="panel-title">// TELEMETRIA_GERAL_DO_SISTEMA</span>
-                <span class="pulse-indicator glow-green">ONLINE</span>
+        <!-- ===== PAGE: CATALOG ===== -->
+        <section id="page-catalog" class="page-content active">
+            <div class="catalog-toolbar">
+                <div class="catalog-filters">
+                    <button class="filter-btn active" data-category="">Todas</button>
+                    <button class="filter-btn" data-category="1">Eletrônicos</button>
+                    <button class="filter-btn" data-category="2">Roupas</button>
+                    <button class="filter-btn" data-category="3">Casa & Cozinha</button>
+                    <button class="filter-btn" data-category="4">Livros</button>
+                </div>
+                <div class="search-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="search-input" placeholder="Buscar produtos..." class="search-input">
+                </div>
             </div>
-            <div class="telemetry-grid">
-                <!-- CPU -->
-                <div class="telemetry-widget">
-                    <div class="widget-info">
-                        <span class="widget-label">CARGA DE CPU</span>
-                        <span id="telemetry-cpu-val" class="widget-value text-green">4.5%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-bar-fill bg-green" id="telemetry-cpu-bar" style="width: 4.5%"></div>
-                    </div>
-                </div>
 
-                <!-- Latency -->
-                <div class="telemetry-widget">
-                    <div class="widget-info">
-                        <span class="widget-label">LATÊNCIA DE RESPOSTA</span>
-                        <span id="telemetry-latency-val" class="widget-value text-orange">21 ms</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-bar-fill bg-orange" id="telemetry-latency-bar" style="width: 15%"></div>
-                    </div>
-                </div>
+            <div id="product-grid" class="product-grid">
+                <!-- Products rendered by JS -->
+            </div>
 
-                <!-- Error Rate -->
-                <div class="telemetry-widget">
-                    <div class="widget-info">
-                        <span class="widget-label">TAXA DE ERROS HTTP</span>
-                        <span id="telemetry-error-val" class="widget-value text-blue">0.0%</span>
+            <!-- Product Detail Modal -->
+            <div id="product-modal" class="modal-overlay hidden">
+                <div class="modal-content cyber-panel" id="product-detail-content">
+                    <button class="modal-close" id="modal-close">&times;</button>
+                    <div id="product-detail-body"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== PAGE: CART ===== -->
+        <section id="page-cart" class="page-content">
+            <div class="cyber-panel">
+                <div class="panel-header">
+                    <span class="panel-title">// CARRINHO_DE_COMPRAS</span>
+                    <span id="cart-count-label" class="db-count">0 ITENS</span>
+                </div>
+                <div id="cart-content">
+                    <div id="cart-empty" class="empty-state">
+                        <span class="empty-icon">🛒</span>
+                        <p>Seu carrinho está vazio</p>
+                        <button class="btn-secondary" onclick="showPage('catalog')">Ver Catálogo</button>
                     </div>
-                    <div class="progress-bar">
-                        <div class="progress-bar-fill bg-blue" id="telemetry-error-bar" style="width: 0%"></div>
+                    <div id="cart-items-container" class="hidden">
+                        <div id="cart-items-list"></div>
+                        <div class="cart-summary">
+                            <div class="cart-total-row">
+                                <span>Total:</span>
+                                <span id="cart-total" class="cart-total-value">R$ 0,00</span>
+                            </div>
+                            <button id="checkout-btn" class="btn-primary" onclick="goToCheckout()">Finalizar Compra</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- 2-COLUMN MAIN LAYOUT -->
-        <div class="dashboard-grid-2col">
-
-            <!-- LEFT COLUMN: Incident Simulator Deck -->
-            <section class="cyber-panel incidents-section">
+        <!-- ===== PAGE: CHECKOUT ===== -->
+        <section id="page-checkout" class="page-content">
+            <div class="cyber-panel">
                 <div class="panel-header">
-                    <span class="panel-title">// CONSOLE_DE_DISPARO_DE_INCIDENTES</span>
-                    <span class="pulse-indicator glow-orange">READY</span>
+                    <span class="panel-title">// CHECKOUT</span>
+                    <span class="system-ping">SEGURO</span>
                 </div>
-                <div class="panel-content">
-                    <p class="section-desc">Gere gargalos artificiais para observar e testar a capacidade de alerta da
-                        stack (Prometheus / Grafana / Loki).</p>
-
-                    <div class="incident-grid-layout">
-                        <!-- HTTP 500 -->
-                        <div class="incident-card error">
-                            <div class="card-header">
-                                <span class="card-icon">🔥</span>
-                                <span class="card-tag tag-danger">ERRO HTTP</span>
+                <form id="checkout-form" class="cyber-form">
+                    <div class="checkout-grid">
+                        <div class="checkout-section">
+                            <h3 class="section-title">📦 Endereço de Entrega</h3>
+                            <div class="input-group">
+                                <label>RUA</label>
+                                <input type="text" id="checkout-address" placeholder="Av. Paulista, 1000" required>
                             </div>
-                            <h3>Erro HTTP 500</h3>
-                            <p>Força erros HTTP 500 no Express e gera picos rápidos no gráfico de erros.</p>
-                            <button onclick="triggerIncident('erro')" class="btn-danger">GERAR ERRO 500</button>
+                            <div class="checkout-row-2col">
+                                <div class="input-group">
+                                    <label>CIDADE</label>
+                                    <input type="text" id="checkout-city" placeholder="São Paulo" required>
+                                </div>
+                                <div class="input-group">
+                                    <label>CEP</label>
+                                    <input type="text" id="checkout-cep" placeholder="01310-100" required>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>OBSERVAÇÃO</label>
+                                <input type="text" id="checkout-obs" placeholder="Deixar com porteiro">
+                            </div>
                         </div>
-
-                        <!-- CPU Spike -->
-                        <div class="incident-card cpu">
-                            <div class="card-header">
-                                <span class="card-icon">⚡</span>
-                                <span class="card-tag tag-warning">CPU SPIKE</span>
+                        <div class="checkout-section">
+                            <h3 class="section-title">🛍️ Resumo do Pedido</h3>
+                            <div id="checkout-items-preview"></div>
+                            <div class="checkout-total-line">
+                                <span>Total:</span>
+                                <span id="checkout-total" class="cart-total-value">R$ 0,00</span>
                             </div>
-                            <h3>Sobrecarga de CPU</h3>
-                            <p>Instancia trabalhadores paralelos que travam o processador da máquina por 5s.</p>
-                            <button onclick="triggerIncident('cpu')" class="btn-warning">TRAVAR PROCESSADOR</button>
-                        </div>
-
-                        <!-- Delay -->
-                        <div class="incident-card delay">
-                            <div class="card-header">
-                                <span class="card-icon">⏳</span>
-                                <span class="card-tag tag-info">TIMEOUT</span>
-                            </div>
-                            <h3>Latência de Rede</h3>
-                            <p>Adiciona delay fixo de 10 segundos em todas as requisições recebidas.</p>
-                            <button onclick="triggerIncident('delay')" class="btn-info">SIMULAR LATÊNCIA</button>
                         </div>
                     </div>
+                    <button type="submit" class="btn-primary" id="checkout-submit-btn">
+                        <span class="btn-text">💰 CONFIRMAR PAGAMENTO</span>
+                    </button>
+                </form>
+                <div id="checkout-loading" class="hidden loading-overlay">
+                    <div class="spinner"></div>
+                    <p>Processando pagamento...</p>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- RIGHT COLUMN: User CRUD & Stack Links (Vertical Stack) -->
-            <div class="right-stack flex-col">
+        <!-- ===== PAGE: ORDERS ===== -->
+        <section id="page-orders" class="page-content">
+            <div class="cyber-panel">
+                <div class="panel-header">
+                    <span class="panel-title">// MEUS_PEDIDOS</span>
+                    <span id="orders-count" class="db-count">0 PEDIDOS</span>
+                </div>
+                <div id="orders-empty" class="empty-state">
+                    <span class="empty-icon">📋</span>
+                    <p>Nenhum pedido encontrado</p>
+                    <button class="btn-secondary" onclick="showPage('catalog')">Comprar Agora</button>
+                </div>
+                <div id="orders-list" class="hidden"></div>
+            </div>
+        </section>
 
-                <!-- CRUD User Database -->
-                <section class="cyber-panel crud-section">
-                    <div class="panel-header">
-                        <span class="panel-title">// BANCO_DE_DADOS_MEMÓRIA</span>
-                        <span class="db-count" id="db-user-count">0 USUÁRIOS</span>
+        <!-- ===== PAGE: ADMIN ===== -->
+        <section id="page-admin" class="page-content">
+            <div class="cyber-panel">
+                <div class="panel-header">
+                    <span class="panel-title">// ADMIN — GERENCIAR_PRODUTOS</span>
+                    <button class="btn-secondary" id="admin-add-btn" onclick="openAdminAdd()">+ Novo Produto</button>
+                </div>
+                <div class="admin-controls">
+                    <button class="filter-btn active" data-admin-cat="">Todos</button>
+                    <button class="filter-btn" data-admin-cat="1">Eletrônicos</button>
+                    <button class="filter-btn" data-admin-cat="2">Roupas</button>
+                    <button class="filter-btn" data-admin-cat="3">Casa & Cozinha</button>
+                    <button class="filter-btn" data-admin-cat="4">Livros</button>
+                </div>
+                <div class="table-container admin-table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Produto</th>
+                                <th>Preço</th>
+                                <th>Estoque</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-products-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Confirmação de Pedido -->
+        <div id="order-confirmation" class="modal-overlay hidden">
+            <div class="modal-content cyber-panel confirmation-modal">
+                <div class="confirmation-icon">✅</div>
+                <h2>Pedido Realizado!</h2>
+                <p>Seu pedido <strong>#<span id="confirm-order-id"></span></strong> foi processado com sucesso.</p>
+                <p class="confirm-sub">Você receberá atualizações sobre o status de entrega.</p>
+                <button class="btn-primary" onclick="closeConfirmation()">OK</button>
+            </div>
+        </div>
+
+        <!-- Admin Modal (Add/Edit Product) -->
+        <div id="admin-modal" class="modal-overlay hidden">
+            <div class="modal-content cyber-panel" style="max-width: 550px;">
+                <div class="panel-header">
+                    <span class="panel-title" id="admin-modal-title">// NOVO_PRODUTO</span>
+                    <button class="modal-close" onclick="closeAdminModal()">&times;</button>
+                </div>
+                <form id="admin-product-form" class="cyber-form">
+                    <input type="hidden" id="admin-product-id">
+                    <div class="input-group">
+                        <label>NOME DO PRODUTO</label>
+                        <input type="text" id="admin-prod-nome" required>
                     </div>
-                    <div class="panel-content flex-col">
-                        <div class="section-actions">
-                            <p class="section-desc">Controle local dos usuários registrados no sistema.</p>
-                            <button class="btn-secondary" onclick="loadUsers()">
-                                <span>🔄</span> Sincronizar
-                            </button>
+                    <div class="input-group">
+                        <label>DESCRIÇÃO</label>
+                        <input type="text" id="admin-prod-descricao" required>
+                    </div>
+                    <div class="checkout-row-2col">
+                        <div class="input-group">
+                            <label>PREÇO (R$)</label>
+                            <input type="number" id="admin-prod-preco" step="0.01" min="0" required>
                         </div>
-
-                        <div class="table-container">
-                            <table id="users-table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>IDENTIFICADOR</th>
-                                        <th style="text-align: right;">REMOVER</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="users-list">
-                                    <!-- Dynamic elements -->
-                                </tbody>
-                            </table>
+                        <div class="input-group">
+                            <label>ESTOQUE</label>
+                            <input type="number" id="admin-prod-estoque" min="0" required>
                         </div>
                     </div>
-                </section>
-
-                <!-- External Monitoring Stack Links -->
-                <section class="cyber-panel service-panel">
-                    <div class="panel-header">
-                        <span class="panel-title">// PORTAL_DE_MONITORAMENTO</span>
+                    <div class="input-group">
+                        <label>CATEGORIA</label>
+                        <select id="admin-prod-categoria" class="input-group input-group select">
+                            <option value="1">Eletrônicos</option>
+                            <option value="2">Roupas</option>
+                            <option value="3">Casa & Cozinha</option>
+                            <option value="4">Livros</option>
+                        </select>
                     </div>
-                    <div class="panel-content service-deck">
-                        <a href="http://localhost:3000" target="_blank" class="service-card grafana">
-                            <div class="service-icon">📊</div>
-                            <div class="service-details">
-                                <h4>Grafana Dashboard</h4>
-                                <p>Acesse o painel central de visualizações em tempo real.</p>
-                            </div>
-                            <span class="external-link-arrow">↗</span>
-                        </a>
-
-                        <a href="http://localhost:9090" target="_blank" class="service-card prometheus">
-                            <div class="service-icon">⚡</div>
-                            <div class="service-details">
-                                <h4>Prometheus Server</h4>
-                                <p>Veja as métricas brutas e as expressões de alertas.</p>
-                            </div>
-                            <span class="external-link-arrow">↗</span>
-                        </a>
-
-                        <a href="http://localhost:3100" target="_blank" class="service-card loki">
-                            <div class="service-icon">🪵</div>
-                            <div class="service-details">
-                                <h4>Grafana Loki</h4>
-                                <p>Consulte logs agregados e fluxos de auditoria.</p>
-                            </div>
-                            <span class="external-link-arrow">↗</span>
-                        </a>
+                    <div class="input-group">
+                        <label>URL DA IMAGEM</label>
+                        <input type="text" id="admin-prod-imagem" placeholder="https://placehold.co/200x200?text=Produto">
                     </div>
-                </section>
-
+                    <button type="submit" class="btn-primary">💾 Salvar Produto</button>
+                </form>
             </div>
         </div>
     </main>
 
-    <!-- Toast Alerts -->
+    <!-- Toast Container -->
     <div id="toast-container"></div>
 
     <script src="script.js"></script>
 </body>
-
 </html>
