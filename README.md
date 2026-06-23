@@ -1,6 +1,9 @@
 <div align="center">
   <h1>🌌 Projeto Observabilidade</h1>
   <p><i>Um laboratório completo de Observabilidade com Node.js, Grafana, Prometheus e Loki</i></p>
+
+  <!-- Status Badges -->
+  <a href="https://github.com/c4rlosfb/Observabilidade/actions/workflows/ci.yml"><img src="https://github.com/c4rlosfb/Observabilidade/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline"></a>
 </div>
 
 ---
