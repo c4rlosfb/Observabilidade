@@ -9,6 +9,22 @@ services:
     networks:
       - observabilidade
 
+  load-generator:
+    build: ./app/load-gen
+    container_name: load_generator
+    profiles:
+      - load-test
+    depends_on:
+      - app
+    environment:
+      - BASE_URL=http://node_app:3001
+      - USERS=3
+      - RATE=1500
+      - DURATION=120
+      - ABANDON_RATE=0.3
+    networks:
+      - observabilidade
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
