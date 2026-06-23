@@ -13,6 +13,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 const catalogRouter = require('./catalog').router;
 app.use('/api', catalogRouter);
 
+// ─── Módulo de Carrinho, Checkout e Pedidos ───────────────────────────────
+const checkoutRouter = require('./checkout').router;
+app.use('/api', checkoutRouter);
+
 // Registro de métricas Prometheus
 const collectDefaultMetrics = promClient.collectDefaultMetrics;
 collectDefaultMetrics({ prefix: 'node_app_' });
