@@ -124,7 +124,7 @@ router.get('/products/:id', (req, res) => {
     logger.info(`Detalhe do produto: ${produto.nome} (id:${produto.id})`, reqCtx(req));
     // Métrica: visualização de produto
     metrics.productViewsTotal.inc({ product_id: String(produto.id) });
-    metrics.trackUserActivity(req.headers['x-user-id'] ? parseInt(req.headers['x-user-id'], 10) : null);
+    metrics.trackUserActivity(req.userId || null);
     res.json(produto);
 });
 

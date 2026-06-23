@@ -212,24 +212,29 @@ app.put('/users/:id', requireAuth, (req, res) => {
     const { id } = req.params;
     const { username, password } = req.body;
     const user = users.find(u => u.id == id);
-    if (user) {
-        if (username) user.username = username;
-        if (password) user.password = password;
-        logger.info(`Usuário ${id} atualizado com sucesso`, {
-            correlation_id: req.correlationId,
-            method: req.method,
-            route: req.path,
-            user_id: user.id
-        });
-        res.json({ id: user.id, username: user.username });
-    } else {
+    if (!user) {
         logger.error(`Falha ao atualizar: Usuário ${id} não encontrado`, {
             correlation_id: req.correlationId,
             method: req.method,
             route: req.path
         });
-        res.status(404).json({ error: 'Usuário não encontrado' });
+        return res.status(404).json({ error: 'Usuário não encontrado' });
     }
+
+    // Apenas o próprio usuário ou admin pode editar
+    if (req.userId !== user.id && req.userRole !== 'admin') {
+        return res.status(403).json({ error: 'Você só pode editar seu próprio perfil' });
+    }
+
+    if (username) user.username = username;
+    if (password) user.password = password;
+    logger.info(`Usuário ${id} atualizado com sucesso`, {
+        correlation_id: req.correlationId,
+        method: req.method,
+        route: req.path,
+        user_id: user.id
+    });
+    res.json({ id: user.id, username: user.username, role: user.role });
 });
 
 app.delete('/users/:id', requireAdmin, (req, res) => {
@@ -275,6 +280,7 @@ app.get('/incidente-cpu', (req, res) => {
     });
     
     let completedWorkers = 0;
+    const workers = [];
     for (let i = 0; i < numCores; i++) {
         const worker = new Worker(path.join(__dirname, 'cpu-worker.js'));
         worker.on('exit', () => {
@@ -287,6 +293,13 @@ app.get('/incidente-cpu', (req, res) => {
                 });
             }
         });
+        worker.on('error', (err) => {
+            logger.error(`Worker ${i} falhou: ${err.message}`, {
+                correlation_id: req.correlationId,
+                error: err
+            });
+        });
+        workers.push(worker);
     }
     res.status(200).json({ message: `Pico de CPU gerado em ${numCores} núcleos` });
 });

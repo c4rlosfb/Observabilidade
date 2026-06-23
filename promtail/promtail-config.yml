@@ -39,11 +39,11 @@ scrape_configs:
       - timestamp:
           source: timestamp
           format: RFC3339
-      # Extrai level como label para filtrar no Loki/Grafana
+      # Extrai level, service, module, method, route como labels
+      # NOTA: correlation_id NÃO vai como label (alta cardinalidade = explosão de séries)
       - labels:
           level:
           service:
           module:
           method:
           route:
-          correlation_id:

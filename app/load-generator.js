@@ -80,53 +80,64 @@ async function userSession(userId) {
     const username = `loaduser_${userId}`;
     const password = 'loadtest123';
 
-    // Register user (ignore if already exists)
+    let token = null;
+    let uid = null;
+
+    // 1. Register user (idempotent: 201 = created, else already exists)
     try {
         const r = await request('POST', '/register', { username, password });
         if (r.status === 201) log(`User ${username} registered`);
-        else log(`User ${username} login ok`);
     } catch {
-        log(`User ${username} auth error`);
+        log(`User ${username}: register failed, trying login`);
+    }
+
+    // 2. Login to get JWT token and user ID
+    try {
+        const r = await request('POST', '/login', { username, password });
+        if (r.status === 200) {
+            const data = JSON.parse(r.body);
+            token = data.token;
+            uid = data.user.id;
+            log(`User ${username}: authenticated (id=${uid})`);
+        } else {
+            log(`User ${username}: login failed (${r.status})`);
+            return;
+        }
+    } catch {
+        log(`User ${username}: auth error`);
         return;
     }
 
-    // Get user ID
-    let uid = userId;
-    try {
-        const r = await request('GET', '/users');
-        const users = JSON.parse(r.body);
-        const u = users.find(x => x.username === username);
-        if (u) uid = u.id;
-    } catch {}
+    if (!token || !uid) return;
 
-    const headers = { 'Content-Type': 'application/json', 'X-User-Id': String(uid) };
+    const authHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 
-    // 1. Browse catalog
+    // 3. Browse catalog
     try {
-        const r = await request('GET', '/api/products');
+        const r = await request('GET', '/api/products', null, authHeaders);
         log(`User ${username}: catalog loaded (${JSON.parse(r.body).length} products)`);
     } catch { log(`User ${username}: catalog error`); }
     await sleep(randomInt(500, ACTION_DELAY));
 
-    // 2. Get categories and browse some products
+    // 4. Get categories and browse by category
     let categories = [];
     try {
-        const r = await request('GET', '/api/categories');
+        const r = await request('GET', '/api/categories', null, authHeaders);
         categories = JSON.parse(r.body);
     } catch {}
     if (categories.length > 0) {
         const cat = pick(categories);
         try {
-            const r = await request('GET', `/api/products?categoria=${cat.id}`);
+            const r = await request('GET', `/api/products?categoria=${cat.id}`, null, authHeaders);
             log(`User ${username}: filtered by "${cat.nome}" (${JSON.parse(r.body).length} products)`);
         } catch {}
         await sleep(randomInt(300, ACTION_DELAY));
     }
 
-    // 3. View 1-3 product details
+    // 5. View 1-3 product details
     let products = [];
     try {
-        const r = await request('GET', '/api/products');
+        const r = await request('GET', '/api/products', null, authHeaders);
         products = JSON.parse(r.body).filter(p => p.estoque > 0);
     } catch {}
 
@@ -137,43 +148,43 @@ async function userSession(userId) {
         const p = pick(products);
         viewed.push(p);
         products = products.filter(x => x.id !== p.id);
-        try { await request('GET', `/api/products/${p.id}`); } catch {}
+        try { await request('GET', `/api/products/${p.id}`, null, authHeaders); } catch {}
         log(`User ${username}: viewed product "${p.nome}"`);
         await sleep(randomInt(300, ACTION_DELAY));
     }
 
     if (viewed.length === 0) return;
 
-    // 4. Add 1-4 items to cart (from viewed products)
+    // 6. Add 1-4 items to cart
     const addCount = randomInt(1, Math.min(4, viewed.length));
 
     for (let i = 0; i < addCount; i++) {
         const p = viewed[i];
         const qty = randomInt(1, Math.min(3, p.estoque || 3));
         try {
-            await request('POST', '/api/cart/add', { productId: p.id, quantity: qty }, headers);
+            await request('POST', '/api/cart/add', { productId: p.id, quantity: qty }, authHeaders);
             log(`User ${username}: added ${p.nome} x${qty} to cart`);
         } catch {}
         await sleep(randomInt(200, ACTION_DELAY));
     }
 
-    // 5. 30% chance to abandon cart
+    // 7. 30% chance to abandon cart
     if (Math.random() < ABANDON_RATE) {
         log(`User ${username}: abandoned cart`);
         return;
     }
 
-    // 6. Checkout
+    // 8. Checkout (JWT identifies the user, no need for userId in body)
     try {
-        const r = await request('POST', '/api/checkout', { userId: uid });
+        const r = await request('POST', '/api/checkout', null, authHeaders);
         if (r.status === 201) {
             const data = JSON.parse(r.body);
             log(`User ${username}: CHECKOUT OK — Order #${data.order.id} (R$${data.order.total})`);
 
-            // 7. Check orders
+            // 9. Check orders
             await sleep(randomInt(300, 500));
             try {
-                const o = await request('GET', '/api/orders', null, headers);
+                const o = await request('GET', '/api/orders', null, authHeaders);
                 log(`User ${username}: ${JSON.parse(o.body).length} order(s)`);
             } catch {}
         } else {

@@ -56,22 +56,16 @@ function formatCartResponse(cart) {
 // ─── Router ────────────────────────────────────────────────────────────────
 const router = Router();
 
-// Middleware: extrai userId do JWT (preferencial) ou header/body (fallback)
+// Middleware: extrai userId do JWT (preferencial) ou header X-User-Id (fallback)
+// NOTA: body.userId NÃO é mais aceito — apenas JWT ou header X-User-Id
 router.use((req, _res, next) => {
     // Já autenticado via JWT (authMiddleware global em app.js)
     if (req.userId) return next();
 
-    // Fallback: header X-User-Id (compatibilidade com load generator)
+    // Fallback: header X-User-Id (compatibilidade com load generator legado)
     const headerId = req.headers['x-user-id'];
     if (headerId) {
         const parsed = parseInt(headerId, 10);
-        if (!isNaN(parsed)) req.userId = parsed;
-        return next();
-    }
-
-    // Fallback: body.userId
-    if (req.body && req.body.userId) {
-        const parsed = parseInt(req.body.userId, 10);
         if (!isNaN(parsed)) req.userId = parsed;
     }
 
@@ -95,7 +89,7 @@ router.get('/cart', (req, res) => {
 // POST /api/cart/add — Adicionar item ao carrinho
 router.post('/cart/add', (req, res) => {
     if (!req.userId) {
-        return res.status(400).json({ error: 'Informe o userId via body ou header X-User-Id' });
+        return res.status(400).json({ error: 'Autenticação necessária (Bearer token ou header X-User-Id)' });
     }
 
     metrics.trackUserActivity(req.userId);
@@ -197,7 +191,7 @@ router.delete('/cart/remove/:itemId', (req, res) => {
 // POST /api/checkout — Finalizar compra
 router.post('/checkout', (req, res) => {
     if (!req.userId) {
-        return res.status(400).json({ error: 'Informe o userId via body ou header X-User-Id' });
+        return res.status(400).json({ error: 'Autenticação necessária (Bearer token ou header X-User-Id)' });
     }
 
     metrics.trackUserActivity(req.userId);
@@ -359,7 +353,7 @@ router.patch('/orders/:id/status', (req, res) => {
     }
 
     // Apenas admin ou dono do pedido pode avançar status
-    if (req.userRole !== 'admin' && parseInt(userKey, 10) !== req.userId) {
+    if (req.userRole !== 'admin' && parseInt(userKey, 10) !== parseInt(req.userId, 10)) {
         logger.warn(`Tentativa não autorizada de avançar pedido #${pedido.id} por user ${req.userId}`, reqCtx(req));
         return res.status(403).json({ error: 'Você não tem permissão para alterar este pedido' });
     }
