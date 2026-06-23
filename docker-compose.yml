@@ -1,73 +1,99 @@
-services:
-  app:
-    build: ./app
-    container_name: node_app
-    ports:
-      - "3001:3001"
-    volumes:
-      - ./app/public:/usr/src/app/public
-    networks:
-      - observabilidade
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-    ports:
-      - "9090:9090"
-    networks:
-      - observabilidade
-
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: node-exporter
-    ports:
-      - "9100:9100"
-    networks:
-      - observabilidade
-
-  loki:
-    image: grafana/loki:latest
-    container_name: loki
-    ports:
-      - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
-      - loki-data:/tmp/loki
-    networks:
-      - observabilidade
-
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
-    command: -config.file=/etc/promtail/config.yml
-    networks:
-      - observabilidade
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
-      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
-    networks:
-      - observabilidade
-
-networks:
-  observabilidade:
-    driver: bridge
-
-volumes:
-  loki-data:
+1|services:
+2|  app:
+3|    build: ./app
+4|    container_name: node_app
+5|    ports:
+6|      - "3001:3001"
+7|    volumes:
+8|      - ./app/public:/usr/src/app/public
+9|    networks:
+10|      - observabilidade
+11|
+12|  prometheus:
+13|    image: prom/prometheus:latest
+14|    container_name: prometheus
+15|    volumes:
+16|      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+17|      - ./prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml
+18|    command:
+19|      - '--config.file=/etc/prometheus/prometheus.yml'
+20|    ports:
+21|      - "9090:9090"
+22|    networks:
+23|      - observabilidade
+24|
+25|  alertmanager:
+26|    image: prom/alertmanager:latest
+27|    container_name: alertmanager
+28|    volumes:
+29|      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+30|    command:
+31|      - '--config.file=/etc/alertmanager/alertmanager.yml'
+32|    ports:
+33|      - "9093:9093"
+34|    networks:
+35|      - observabilidade
+36|
+37|  node-exporter:
+38|    image: prom/node-exporter:latest
+39|    container_name: node-exporter
+40|    ports:
+41|      - "9100:9100"
+42|    networks:
+43|      - observabilidade
+44|
+45|  loki:
+46|    image: grafana/loki:latest
+47|    container_name: loki
+48|    ports:
+49|      - "3100:3100"
+50|    command: -config.file=/etc/loki/local-config.yaml
+51|    volumes:
+52|      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+53|      - ./loki/rules.yml:/etc/loki/rules.yml
+54|      - loki-data:/tmp/loki
+55|    networks:
+56|      - observabilidade
+57|
+58|  promtail:
+59|    image: grafana/promtail:latest
+60|    container_name: promtail
+61|    volumes:
+62|      - /var/run/docker.sock:/var/run/docker.sock:ro
+63|      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
+64|    command: -config.file=/etc/promtail/config.yml
+65|    networks:
+66|      - observabilidade
+67|
+68|  grafana:
+69|    image: grafana/grafana:latest
+70|    container_name: grafana
+71|    ports:
+72|      - "3000:3000"
+73|    environment:
+74|      - GF_SECURITY_ADMIN_PASSWORD=admin
+75|    volumes:
+76|      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+77|      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+78|      - ./grafana/dashboards:/var/lib/grafana/dashboards
+79|    networks:
+80|      - observabilidade
+81|
+82|  # Webhook demo para receber alertas (simula Slack/Teams)
+83|  webhook-demo:
+84|    image: mendhak/http-https-echo:latest
+85|    container_name: webhook-demo
+86|    ports:
+87|      - "8080:8080"
+88|    environment:
+89|      - HTTP_PORT=8080
+90|    networks:
+91|      - observabilidade
+92|
+93|networks:
+94|  observabilidade:
+95|    driver: bridge
+96|
+97|volumes:
+98|  loki-data:
+99|
