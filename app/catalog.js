@@ -5,6 +5,9 @@
 
 const { Router } = require('express');
 const metrics = require('./metrics');
+const { createLogger } = require('./logger');
+
+const logger = createLogger('catalog');
 
 // ─── Dados em Memória ──────────────────────────────────────────────────────
 let nextCategoryId = 1;
@@ -41,10 +44,13 @@ const products = [
 // Initialize stock metrics
 metrics.updateStockMetrics(products);
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-function log(level, message) {
-    const ts = new Date().toISOString();
-    console.log(`[${ts}] [${level.toUpperCase()}] [Catalogo] ${message}`);
+// ─── Helper para extrair contexto da request ────────────────────────────────
+function reqCtx(req) {
+    return {
+        correlation_id: req.correlationId,
+        method: req.method,
+        route: req.path
+    };
 }
 
 // ─── Router ────────────────────────────────────────────────────────────────
@@ -53,8 +59,8 @@ const router = Router();
 // ─── CATEGORIAS ────────────────────────────────────────────────────────────
 
 // GET /api/categories — Listar categorias
-router.get('/categories', (_req, res) => {
-    log('info', 'Listando categorias');
+router.get('/categories', (req, res) => {
+    logger.info('Listando categorias', reqCtx(req));
     res.json(categories);
 });
 
@@ -62,13 +68,13 @@ router.get('/categories', (_req, res) => {
 router.post('/categories', (req, res) => {
     const { nome, descricao } = req.body;
     if (!nome || !descricao) {
-        log('error', 'Falha ao criar categoria: dados incompletos');
+        logger.error('Falha ao criar categoria: dados incompletos', reqCtx(req));
         return res.status(400).json({ error: 'nome e descricao são obrigatórios' });
     }
 
     const categoria = { id: nextCategoryId++, nome, descricao };
     categories.push(categoria);
-    log('info', `Categoria criada: ${nome} (id:${categoria.id})`);
+    logger.info(`Categoria criada: ${nome} (id:${categoria.id})`, reqCtx(req));
     res.status(201).json(categoria);
 });
 
@@ -83,7 +89,7 @@ router.get('/products', (req, res) => {
     if (categoria) {
         const catId = parseInt(categoria, 10);
         resultado = resultado.filter(p => p.categoriaId === catId);
-        log('info', `Filtrando produtos por categoriaId: ${categoria}`);
+        logger.info(`Filtrando produtos por categoriaId: ${categoria}`, reqCtx(req));
     }
 
     if (busca) {
@@ -92,10 +98,10 @@ router.get('/products', (req, res) => {
             p.nome.toLowerCase().includes(termo) ||
             p.descricao.toLowerCase().includes(termo)
         );
-        log('info', `Buscando produtos por termo: "${busca}"`);
+        logger.info(`Buscando produtos por termo: "${busca}"`, reqCtx(req));
     }
 
-    log('info', `Listando ${resultado.length} produtos`);
+    logger.info(`Listando ${resultado.length} produtos`, reqCtx(req));
     res.json(resultado);
 });
 
@@ -103,10 +109,10 @@ router.get('/products', (req, res) => {
 router.get('/products/:id', (req, res) => {
     const produto = products.find(p => p.id === parseInt(req.params.id, 10));
     if (!produto) {
-        log('warn', `Produto ${req.params.id} não encontrado`);
+        logger.warn(`Produto ${req.params.id} não encontrado`, reqCtx(req));
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
-    log('info', `Detalhe do produto: ${produto.nome} (id:${produto.id})`);
+    logger.info(`Detalhe do produto: ${produto.nome} (id:${produto.id})`, reqCtx(req));
     // Métrica: visualização de produto
     metrics.productViewsTotal.inc({ product_id: String(produto.id) });
     metrics.trackUserActivity(req.headers['x-user-id'] ? parseInt(req.headers['x-user-id'], 10) : null);
@@ -118,13 +124,13 @@ router.post('/products', (req, res) => {
     const { nome, descricao, preco, categoriaId, estoque, imagemUrl } = req.body;
 
     if (!nome || descricao === undefined || preco === undefined || !categoriaId) {
-        log('error', 'Falha ao criar produto: dados incompletos');
+        logger.error('Falha ao criar produto: dados incompletos', reqCtx(req));
         return res.status(400).json({ error: 'nome, descricao, preco e categoriaId são obrigatórios' });
     }
 
     const catExiste = categories.find(c => c.id === parseInt(categoriaId, 10));
     if (!catExiste) {
-        log('error', `Falha ao criar produto: categoria ${categoriaId} não existe`);
+        logger.error(`Falha ao criar produto: categoria ${categoriaId} não existe`, reqCtx(req));
         return res.status(400).json({ error: 'Categoria informada não existe' });
     }
 
@@ -141,7 +147,7 @@ router.post('/products', (req, res) => {
 
     products.push(produto);
     metrics.stockLevel.set({ product_id: String(produto.id), product_name: produto.nome }, produto.estoque);
-    log('info', `Produto criado: ${produto.nome} (id:${produto.id}, R$${produto.preco})`);
+    logger.info(`Produto criado: ${produto.nome} (id:${produto.id}, R$${produto.preco})`, reqCtx(req));
     res.status(201).json(produto);
 });
 
@@ -149,7 +155,7 @@ router.post('/products', (req, res) => {
 router.put('/products/:id', (req, res) => {
     const produto = products.find(p => p.id === parseInt(req.params.id, 10));
     if (!produto) {
-        log('warn', `Falha ao atualizar: produto ${req.params.id} não encontrado`);
+        logger.warn(`Falha ao atualizar: produto ${req.params.id} não encontrado`, reqCtx(req));
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
@@ -172,7 +178,7 @@ router.put('/products/:id', (req, res) => {
     }
     if (imagemUrl !== undefined) produto.imagemUrl = imagemUrl;
 
-    log('info', `Produto atualizado: ${produto.nome} (id:${produto.id})`);
+    logger.info(`Produto atualizado: ${produto.nome} (id:${produto.id})`, reqCtx(req));
     res.json(produto);
 });
 
@@ -180,12 +186,12 @@ router.put('/products/:id', (req, res) => {
 router.delete('/products/:id', (req, res) => {
     const index = products.findIndex(p => p.id === parseInt(req.params.id, 10));
     if (index === -1) {
-        log('warn', `Falha ao deletar: produto ${req.params.id} não encontrado`);
+        logger.warn(`Falha ao deletar: produto ${req.params.id} não encontrado`, reqCtx(req));
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
     const removido = products.splice(index, 1)[0];
-    log('info', `Produto removido: ${removido.nome} (id:${removido.id})`);
+    logger.info(`Produto removido: ${removido.nome} (id:${removido.id})`, reqCtx(req));
     res.status(204).send();
 });
 
@@ -193,13 +199,13 @@ router.delete('/products/:id', (req, res) => {
 router.patch('/products/:id/stock', (req, res) => {
     const produto = products.find(p => p.id === parseInt(req.params.id, 10));
     if (!produto) {
-        log('warn', `Falha ao atualizar estoque: produto ${req.params.id} não encontrado`);
+        logger.warn(`Falha ao atualizar estoque: produto ${req.params.id} não encontrado`, reqCtx(req));
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
     const { quantidade } = req.body;
     if (quantidade === undefined || !Number.isInteger(quantidade) || quantidade < 0) {
-        log('error', 'Falha ao atualizar estoque: quantidade inválida');
+        logger.error('Falha ao atualizar estoque: quantidade inválida', reqCtx(req));
         return res.status(400).json({ error: 'quantidade deve ser um inteiro >= 0' });
     }
 
@@ -207,8 +213,8 @@ router.patch('/products/:id/stock', (req, res) => {
     produto.estoque = quantidade;
     metrics.stockLevel.set({ product_id: String(produto.id), product_name: produto.nome }, produto.estoque);
     metrics.checkLowStock(produto);
-    log('info', `Estoque atualizado: ${produto.nome} (id:${produto.id}) ${anterior} → ${quantidade}`);
+    logger.info(`Estoque atualizado: ${produto.nome} (id:${produto.id}) ${anterior} → ${quantidade}`, reqCtx(req));
     res.json({ id: produto.id, nome: produto.nome, estoque: produto.estoque });
 });
 
-module.exports = { router, categories, products, log };
+module.exports = { router, categories, products };

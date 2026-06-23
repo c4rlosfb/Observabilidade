@@ -1,0 +1,54 @@
+groups:
+  - name: loki_app_alerts
+    rules:
+      # ─── ALERTAS DE LOG ────────────────────────────────────────────────
+
+      - alert: ErrosFrequentesPagamento
+        expr: |
+          sum(rate({service="node-app", level="error"} 
+            | json 
+            | message =~ "(?i)pagamento"[5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          category: logs
+        annotations:
+          summary: "Erros frequentes de pagamento nos logs"
+          description: "{{ $value }} erros de pagamento por minuto detectados nos logs nos últimos 5 minutos"
+
+      - alert: MuitosPedidosFalhaEstoque
+        expr: |
+          sum(rate({service="node-app", level="warn"} 
+            | json 
+            | message =~ "(?i)estoque insuficiente"[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+          category: logs
+        annotations:
+          summary: "Muitos pedidos com falha de estoque"
+          description: "{{ $value }} warnings de estoque insuficiente por minuto nos últimos 5 minutos"
+
+      - alert: Erro500Frequente
+        expr: |
+          sum(rate({service="node-app"} 
+            | json 
+            | status_code >= 500[5m])) > 3
+        for: 1m
+        labels:
+          severity: critical
+          category: logs
+        annotations:
+          summary: "Erros HTTP 500 frequentes"
+          description: "{{ $value }} erros 500 por minuto nos últimos 5 minutos"
+
+      - alert: ZeroLogsApp
+        expr: |
+          sum(rate({service="node-app"}[5m])) == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: logs
+        annotations:
+          summary: "Sem logs da aplicação"
+          description: "Nenhum log da aplicação node-app nos últimos 5 minutos — possível crash"

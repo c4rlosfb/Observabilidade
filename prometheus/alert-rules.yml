@@ -1,0 +1,91 @@
+groups:
+  - name: node_app_alerts
+    rules:
+      # ─── ALERTAS DE SISTEMA ────────────────────────────────────────────
+
+      - alert: CPUAlta
+        expr: rate(node_app_process_cpu_seconds_total[2m]) > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          category: system
+        annotations:
+          summary: "CPU alta na aplicação Node.js"
+          description: "O uso de CPU da aplicação está acima de 80% por mais de 2 minutos (valor: {{ $value }})"
+
+      - alert: TaxaErroHTTPAlta
+        expr: |
+          (
+            sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "Taxa de erro HTTP acima de 10%"
+          description: "{{ $value | humanizePercentage }} das requisições estão retornando erro 5xx nos últimos 5 minutos"
+
+      - alert: LatenciaAlta
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+          category: system
+        annotations:
+          summary: "Latência P95 acima de 5 segundos"
+          description: "O percentil 95 do tempo de resposta está em {{ $value }}s"
+
+      # ─── ALERTAS DE NEGÓCIO ────────────────────────────────────────────
+
+      - alert: EstoqueBaixo
+        expr: ecommerce_stock_level < 5
+        for: 30s
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "Estoque baixo: {{ $labels.product_name }}"
+          description: "Produto '{{ $labels.product_name }}' (id: {{ $labels.product_id }}) está com apenas {{ $value }} unidades em estoque"
+
+      - alert: CarrinhoAbandonadoElevado
+        expr: rate(ecommerce_cart_abandonment_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "Taxa de carrinhos abandonados elevada"
+          description: "{{ $value | humanize }} carrinhos abandonados por minuto nos últimos 5 minutos"
+
+      - alert: FalhaPagamento
+        expr: rate(ecommerce_payment_errors_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: critical
+          category: business
+        annotations:
+          summary: "Alta taxa de falha no pagamento"
+          description: "{{ $value | humanize }} erros de pagamento por minuto nos últimos 5 minutos"
+
+      - alert: PedidosPendentesAcumulados
+        expr: ecommerce_orders_total{status="pending"} > 50
+        for: 5m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "Acúmulo de pedidos pendentes"
+          description: "{{ $value }} pedidos estão no status 'pending' há mais de 5 minutos"
+
+      - alert: SemReceitaRecente
+        expr: rate(ecommerce_revenue_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "Sem receita nos últimos 10 minutos"
+          description: "Nenhuma receita foi registrada nos últimos 10 minutos — possível problema no checkout"

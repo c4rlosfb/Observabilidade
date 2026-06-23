@@ -1,0 +1,38 @@
+global:
+  resolve_timeout: 5m
+
+# Roteamento básico
+route:
+  receiver: 'webhook-default'
+  group_by: ['alertname', 'category']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+
+  routes:
+    # Alertas críticos notificam com mais urgência
+    - match:
+        severity: critical
+      receiver: 'webhook-critical'
+      group_wait: 5s
+      repeat_interval: 15m
+
+# Receivers
+receivers:
+  - name: 'webhook-default'
+    webhook_configs:
+      - url: 'http://webhook-demo:8080/alert'
+        send_resolved: true
+
+  - name: 'webhook-critical'
+    webhook_configs:
+      - url: 'http://webhook-demo:8080/alert/critical'
+        send_resolved: true
+
+# Inibição: alerta de CPU alta suprime alerta de latência
+inhibit_rules:
+  - source_match:
+      alertname: 'CPUAlta'
+    target_match:
+      alertname: 'LatenciaAlta'
+    equal: ['instance']
