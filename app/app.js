@@ -9,6 +9,14 @@ app.use(express.json());
 app.set('json spaces', 2); // Deixa o output do JSON formatado e com quebra de linha no curl
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ─── Módulo de Catálogo (Produtos & Categorias) ───────────────────────────
+const catalogRouter = require('./catalog').router;
+app.use('/api', catalogRouter);
+
+// ─── Módulo de Carrinho, Checkout e Pedidos ───────────────────────────────
+const checkoutRouter = require('./checkout').router;
+app.use('/api', checkoutRouter);
+
 // Registro de métricas Prometheus
 const collectDefaultMetrics = promClient.collectDefaultMetrics;
 collectDefaultMetrics({ prefix: 'node_app_' });
