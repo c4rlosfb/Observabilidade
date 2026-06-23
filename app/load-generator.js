@@ -44,7 +44,7 @@ function pick(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function request(method, path, body = null) {
+function request(method, path, body = null, extraHeaders = {}) {
     return new Promise((resolve, reject) => {
         totalRequests++;
         const url = `${BASE_URL}${path}`;
@@ -55,7 +55,7 @@ function request(method, path, body = null) {
             port: parsed.port || 80,
             path: parsed.path,
             method,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', ...extraHeaders }
         };
 
         const req = http.request(options, (res) => {
@@ -151,7 +151,7 @@ async function userSession(userId) {
         const p = viewed[i];
         const qty = randomInt(1, Math.min(3, p.estoque || 3));
         try {
-            await request('POST', '/api/cart/add', { productId: p.id, quantity: qty });
+            await request('POST', '/api/cart/add', { productId: p.id, quantity: qty }, headers);
             log(`User ${username}: added ${p.nome} x${qty} to cart`);
         } catch {}
         await sleep(randomInt(200, ACTION_DELAY));
@@ -173,7 +173,7 @@ async function userSession(userId) {
             // 7. Check orders
             await sleep(randomInt(300, 500));
             try {
-                const o = await request('GET', '/api/orders');
+                const o = await request('GET', '/api/orders', null, headers);
                 log(`User ${username}: ${JSON.parse(o.body).length} order(s)`);
             } catch {}
         } else {
