@@ -4,6 +4,7 @@
  */
 
 const { Router } = require('express');
+const metrics = require('./metrics');
 
 // ─── Dados em Memória ──────────────────────────────────────────────────────
 let nextCategoryId = 1;
@@ -36,6 +37,9 @@ const products = [
     { id: nextProductId++, nome: 'Livro — Domain-Driven Design', descricao: 'Eric Evans — Modelagem de domínios complexos', preco: 129.90, categoriaId: 4, estoque: 15, imagemUrl: 'https://placehold.co/200x200?text=DDD', criadoEm: new Date().toISOString() },
     { id: nextProductId++, nome: 'Livro — A Arte da Guerra', descricao: 'Sun Tzu — Estratégia clássica aplicada aos negócios', preco: 34.90, categoriaId: 4, estoque: 8, imagemUrl: 'https://placehold.co/200x200?text=Guerra', criadoEm: new Date().toISOString() }
 ];
+
+// Initialize stock metrics
+metrics.updateStockMetrics(products);
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 function log(level, message) {
@@ -103,6 +107,9 @@ router.get('/products/:id', (req, res) => {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
     log('info', `Detalhe do produto: ${produto.nome} (id:${produto.id})`);
+    // Métrica: visualização de produto
+    metrics.productViewsTotal.inc({ product_id: String(produto.id) });
+    metrics.trackUserActivity(req.headers['x-user-id'] ? parseInt(req.headers['x-user-id'], 10) : null);
     res.json(produto);
 });
 
@@ -133,6 +140,7 @@ router.post('/products', (req, res) => {
     };
 
     products.push(produto);
+    metrics.stockLevel.set({ product_id: String(produto.id), product_name: produto.nome }, produto.estoque);
     log('info', `Produto criado: ${produto.nome} (id:${produto.id}, R$${produto.preco})`);
     res.status(201).json(produto);
 });
@@ -157,7 +165,11 @@ router.put('/products/:id', (req, res) => {
         }
         produto.categoriaId = parseInt(categoriaId, 10);
     }
-    if (estoque !== undefined) produto.estoque = parseInt(estoque, 10);
+    if (estoque !== undefined) {
+        produto.estoque = parseInt(estoque, 10);
+        metrics.stockLevel.set({ product_id: String(produto.id), product_name: produto.nome }, produto.estoque);
+        metrics.checkLowStock(produto);
+    }
     if (imagemUrl !== undefined) produto.imagemUrl = imagemUrl;
 
     log('info', `Produto atualizado: ${produto.nome} (id:${produto.id})`);
@@ -193,6 +205,8 @@ router.patch('/products/:id/stock', (req, res) => {
 
     const anterior = produto.estoque;
     produto.estoque = quantidade;
+    metrics.stockLevel.set({ product_id: String(produto.id), product_name: produto.nome }, produto.estoque);
+    metrics.checkLowStock(produto);
     log('info', `Estoque atualizado: ${produto.nome} (id:${produto.id}) ${anterior} → ${quantidade}`);
     res.json({ id: produto.id, nome: produto.nome, estoque: produto.estoque });
 });

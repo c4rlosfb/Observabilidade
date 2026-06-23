@@ -17,6 +17,14 @@ app.use('/api', catalogRouter);
 const checkoutRouter = require('./checkout').router;
 app.use('/api', checkoutRouter);
 
+// ─── Métricas de Negócio ───────────────────────────────────────────────────
+const bizMetrics = require('./metrics');
+setInterval(() => {
+    const { products } = require('./catalog');
+    bizMetrics.updateStockMetrics(products);
+    bizMetrics.trackUserActivity(null);
+}, 30000);
+
 // Registro de métricas Prometheus
 const collectDefaultMetrics = promClient.collectDefaultMetrics;
 collectDefaultMetrics({ prefix: 'node_app_' });

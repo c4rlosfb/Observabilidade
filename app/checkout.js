@@ -5,6 +5,7 @@
 
 const { Router } = require('express');
 const { products } = require('./catalog');
+const metrics = require('./metrics');
 
 // ─── Dados em Memória ──────────────────────────────────────────────────────
 // carts: { [userId]: [{ cartItemId, productId, productName, price, quantity }] }
@@ -69,7 +70,9 @@ router.get('/cart', (req, res) => {
         return res.status(400).json({ error: 'Informe o userId via header X-User-Id' });
     }
     const cart = getCart(req.userId);
+    metrics.trackUserActivity(req.userId);
     log('info', `Visualizando carrinho do usuário ${req.userId}: ${cart.length} itens`);
+    metrics.cartItemsGauge.set(cart.reduce((s, i) => s + i.quantity, 0));
     res.json(formatCartResponse(cart));
 });
 
@@ -78,6 +81,8 @@ router.post('/cart/add', (req, res) => {
     if (!req.userId) {
         return res.status(400).json({ error: 'Informe o userId via body ou header X-User-Id' });
     }
+
+    metrics.trackUserActivity(req.userId);
 
     const { productId, quantity } = req.body;
     if (!productId || !quantity || quantity < 1) {
@@ -118,6 +123,7 @@ router.post('/cart/add', (req, res) => {
         log('info', `Carrinho (user ${req.userId}): adicionado ${produto.nome} x${qtd}`);
     }
 
+    metrics.cartItemsGauge.set(cart.reduce((s, i) => s + i.quantity, 0));
     res.status(200).json(formatCartResponse(cart));
 });
 
@@ -151,6 +157,7 @@ router.put('/cart/update/:itemId', (req, res) => {
         log('info', `Carrinho (user ${req.userId}): ${item.productName} quantidade atualizada para ${qtd}`);
     }
 
+    metrics.cartItemsGauge.set(cart.reduce((s, i) => s + i.quantity, 0));
     res.json(formatCartResponse(cart));
 });
 
@@ -171,6 +178,7 @@ router.delete('/cart/remove/:itemId', (req, res) => {
     const removido = cart.splice(idx, 1)[0];
     log('info', `Carrinho (user ${req.userId}): ${removido.productName} removido`);
 
+    metrics.cartItemsGauge.set(cart.reduce((s, i) => s + i.quantity, 0));
     res.json(formatCartResponse(cart));
 });
 
@@ -181,6 +189,9 @@ router.post('/checkout', (req, res) => {
     if (!req.userId) {
         return res.status(400).json({ error: 'Informe o userId via body ou header X-User-Id' });
     }
+
+    metrics.trackUserActivity(req.userId);
+    const startTime = Date.now();
 
     const cart = getCart(req.userId);
 
@@ -212,6 +223,8 @@ router.post('/checkout', (req, res) => {
 
     if (falhaPagamento) {
         log('error', `Checkout (user ${req.userId}): pagamento recusado (simulação)`);
+        metrics.paymentErrorsTotal.inc({ reason: 'payment_declined' });
+        metrics.cartAbandonmentTotal.inc();
         return res.status(402).json({ error: 'Pagamento recusado. Tente novamente.' });
     }
 
@@ -245,12 +258,23 @@ router.post('/checkout', (req, res) => {
         const produto = products.find(p => p.id === item.productId);
         if (produto) {
             produto.estoque -= item.quantity;
+            metrics.stockLevel.set({ product_id: String(produto.id), product_name: produto.nome }, produto.estoque);
+            metrics.checkLowStock(produto);
             log('info', `Estoque abaixado: ${produto.nome} (${produto.estoque + item.quantity} → ${produto.estoque})`);
         }
     }
 
     // Limpar carrinho
     carts[req.userId] = [];
+
+    // Métricas de negócio
+    metrics.ordersTotal.inc({ status: 'pending' });
+    metrics.revenueTotal.inc(total);
+    metrics.orderValueHistogram.observe(total);
+    metrics.cartItemsGauge.set(0);
+
+    const duration = (Date.now() - startTime) / 1000;
+    metrics.checkoutDurationSeconds.observe(duration);
 
     log('info', `Pedido #${order.id} criado para user ${req.userId}: R$${total} (${orderItems.length} itens)`);
 
@@ -280,6 +304,7 @@ router.get('/orders', (req, res) => {
     }
 
     const userOrders = orders[req.userId] || [];
+    metrics.trackUserActivity(req.userId);
     log('info', `Listando ${userOrders.length} pedidos do user ${req.userId}`);
 
     res.json(userOrders.map(o => ({
@@ -340,9 +365,11 @@ router.patch('/orders/:id/status', (req, res) => {
     }
 
     const nextStatus = ORDER_STATUSES[currentIdx + 1];
+    const oldStatus = pedido.status;
     pedido.status = nextStatus;
     pedido.updatedAt = new Date().toISOString();
 
+    metrics.ordersTotal.inc({ status: nextStatus });
     log('info', `Pedido #${pedido.id} (user ${userKey}): status avançado para "${nextStatus}"`);
 
     res.json({ id: pedido.id, status: pedido.status, updatedAt: pedido.updatedAt });
