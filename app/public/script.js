@@ -5,12 +5,21 @@
 // ─── STATE ──────────────────────────────────────────────────
 let currentUser = null;
 let currentUserId = null;
+let currentToken = null;
+let currentRole = null;
 let products = [];
 let categories = [];
 let cart = { items: [], total: 0, totalItems: 0 };
 let currentFilter = '';
 let currentSearch = '';
 let adminFilter = '';
+
+// ─── API Helper ─────────────────────────────────────────────
+function apiHeaders(extra = {}) {
+    const headers = { 'Content-Type': 'application/json', ...extra };
+    if (currentToken) headers['Authorization'] = `Bearer ${currentToken}`;
+    return headers;
+}
 
 // ─── DOM REFS ───────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -63,9 +72,10 @@ authForm.addEventListener('submit', async (e) => {
 
         if (res.ok) {
             if (isLogin) {
-                // Find user ID
-                currentUser = username;
-                await fetchUserId();
+                currentUser = data.user.username;
+                currentUserId = data.user.id;
+                currentToken = data.token;
+                currentRole = data.user.role;
                 showToast('Acesso concedido. Bem-vindo.', 'success');
                 enterDashboard();
             } else {
@@ -85,18 +95,11 @@ authForm.addEventListener('submit', async (e) => {
     }
 });
 
-async function fetchUserId() {
-    try {
-        const res = await fetch('/users');
-        const users = await res.json();
-        const user = users.find(u => u.username === currentUser);
-        if (user) currentUserId = user.id;
-    } catch (_) { /* silent */ }
-}
-
 logoutBtn.addEventListener('click', () => {
     currentUser = null;
     currentUserId = null;
+    currentToken = null;
+    currentRole = null;
     cart = { items: [], total: 0, totalItems: 0 };
     dashboardView.classList.remove('active');
     setTimeout(() => {
@@ -115,7 +118,10 @@ function enterDashboard() {
     }, 450);
 
     currentUserDisplay.innerText = currentUser;
-    userIdBadge.innerText = currentUserId ? `(#${currentUserId})` : '';
+    userIdBadge.innerText = `(#${currentUserId} · ${currentRole === 'admin' ? 'ADMIN' : 'USER'})`;
+    // Esconder aba admin para não-admins
+    const adminNavLink = document.querySelector('.nav-link[data-page="admin"]');
+    if (adminNavLink) adminNavLink.style.display = currentRole === 'admin' ? '' : 'none';
     showPage('catalog');
     loadCatalog();
     loadCart();
@@ -144,7 +150,13 @@ function showPage(page) {
         case 'catalog': loadCatalog(); break;
         case 'cart': loadCart(); break;
         case 'orders': loadOrders(); break;
-        case 'admin': loadAdminProducts(); break;
+        case 'admin':
+            if (currentRole !== 'admin') {
+                showToast('Acesso restrito a administradores.', 'error');
+                return showPage('catalog');
+            }
+            loadAdminProducts();
+            break;
     }
 }
 
@@ -282,8 +294,8 @@ async function addToCart(productId, quantity) {
     try {
         const res = await fetch('/api/cart/add', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUserId, productId, quantity })
+            headers: apiHeaders(),
+            body: JSON.stringify({ productId, quantity })
         });
 
         if (!res.ok) {
@@ -306,7 +318,7 @@ async function loadCart() {
 
     try {
         const res = await fetch('/api/cart', {
-            headers: { 'X-User-Id': currentUserId }
+            headers: apiHeaders()
         });
 
         if (res.ok) {
@@ -377,8 +389,8 @@ async function updateCartItem(itemId, newQty) {
     try {
         const res = await fetch(`/api/cart/update/${itemId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUserId, quantity: newQty })
+            headers: apiHeaders(),
+            body: JSON.stringify({ quantity: newQty })
         });
 
         if (res.ok) {
@@ -393,8 +405,7 @@ async function removeCartItem(itemId) {
     try {
         const res = await fetch(`/api/cart/remove/${itemId}`, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUserId })
+            headers: apiHeaders()
         });
 
         if (res.ok) {
@@ -454,8 +465,7 @@ $('checkout-form').addEventListener('submit', async (e) => {
     try {
         const res = await fetch('/api/checkout', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUserId })
+            headers: apiHeaders()
         });
 
         const data = await res.json();
@@ -495,7 +505,7 @@ async function loadOrders() {
 
     try {
         const res = await fetch('/api/orders', {
-            headers: { 'X-User-Id': currentUserId }
+            headers: apiHeaders()
         });
 
         if (!res.ok) {
@@ -647,14 +657,13 @@ $('admin-product-form').addEventListener('submit', async (e) => {
             // Update
             res = await fetch(`/api/products/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: apiHeaders(),
                 body: JSON.stringify(data)
             });
         } else {
-            // Create
             res = await fetch('/api/products', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: apiHeaders(),
                 body: JSON.stringify(data)
             });
         }
@@ -677,7 +686,7 @@ async function deleteAdminProduct(id) {
     if (!confirm('Tem certeza que deseja remover este produto?')) return;
 
     try {
-        const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+        const res = await fetch(`/api/products/${id}`, { method: 'DELETE', headers: apiHeaders() });
         if (res.ok) {
             showToast('Produto removido.', 'info');
             loadAdminProducts();

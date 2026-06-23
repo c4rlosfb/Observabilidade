@@ -49,10 +49,17 @@ function reqCtx(req) {
     return {
         correlation_id: req.correlationId,
         method: req.method,
-        route: req.path
+        route: req.path,
+        user_id: req.userId || undefined
     };
 }
 
+// ─── Helper: verifica se usuário é admin ────────────────────────────────────
+function requireAdmin(req, res) {
+    if (!req.userId) return res.status(401).json({ error: 'Autenticação necessária' });
+    if (req.userRole !== 'admin') return res.status(403).json({ error: 'Acesso restrito a administradores' });
+    return null;
+}
 // ─── Router ────────────────────────────────────────────────────────────────
 const router = Router();
 
@@ -64,8 +71,10 @@ router.get('/categories', (req, res) => {
     res.json(categories);
 });
 
-// POST /api/categories — Criar categoria
+// POST /api/categories — Criar categoria (admin)
 router.post('/categories', (req, res) => {
+    const err = requireAdmin(req, res);
+    if (err) return;
     const { nome, descricao } = req.body;
     if (!nome || !descricao) {
         logger.error('Falha ao criar categoria: dados incompletos', reqCtx(req));
@@ -121,6 +130,8 @@ router.get('/products/:id', (req, res) => {
 
 // POST /api/products — Criar produto (admin)
 router.post('/products', (req, res) => {
+    const err = requireAdmin(req, res);
+    if (err) return;
     const { nome, descricao, preco, categoriaId, estoque, imagemUrl } = req.body;
 
     if (!nome || descricao === undefined || preco === undefined || !categoriaId) {
@@ -153,6 +164,8 @@ router.post('/products', (req, res) => {
 
 // PUT /api/products/:id — Atualizar produto (admin)
 router.put('/products/:id', (req, res) => {
+    const err = requireAdmin(req, res);
+    if (err) return;
     const produto = products.find(p => p.id === parseInt(req.params.id, 10));
     if (!produto) {
         logger.warn(`Falha ao atualizar: produto ${req.params.id} não encontrado`, reqCtx(req));
@@ -184,6 +197,8 @@ router.put('/products/:id', (req, res) => {
 
 // DELETE /api/products/:id — Remover produto (admin)
 router.delete('/products/:id', (req, res) => {
+    const err = requireAdmin(req, res);
+    if (err) return;
     const index = products.findIndex(p => p.id === parseInt(req.params.id, 10));
     if (index === -1) {
         logger.warn(`Falha ao deletar: produto ${req.params.id} não encontrado`, reqCtx(req));
@@ -195,8 +210,10 @@ router.delete('/products/:id', (req, res) => {
     res.status(204).send();
 });
 
-// PATCH /api/products/:id/stock — Atualizar estoque
+// PATCH /api/products/:id/stock — Atualizar estoque (admin)
 router.patch('/products/:id/stock', (req, res) => {
+    const err = requireAdmin(req, res);
+    if (err) return;
     const produto = products.find(p => p.id === parseInt(req.params.id, 10));
     if (!produto) {
         logger.warn(`Falha ao atualizar estoque: produto ${req.params.id} não encontrado`, reqCtx(req));

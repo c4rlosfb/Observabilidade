@@ -56,11 +56,25 @@ function formatCartResponse(cart) {
 // ─── Router ────────────────────────────────────────────────────────────────
 const router = Router();
 
-// Middleware: extrai userId do header ou body
+// Middleware: extrai userId do JWT (preferencial) ou header/body (fallback)
 router.use((req, _res, next) => {
-    req.userId = req.headers['x-user-id']
-        ? parseInt(req.headers['x-user-id'], 10)
-        : (req.body && req.body.userId ? parseInt(req.body.userId, 10) : null);
+    // Já autenticado via JWT (authMiddleware global em app.js)
+    if (req.userId) return next();
+
+    // Fallback: header X-User-Id (compatibilidade com load generator)
+    const headerId = req.headers['x-user-id'];
+    if (headerId) {
+        const parsed = parseInt(headerId, 10);
+        if (!isNaN(parsed)) req.userId = parsed;
+        return next();
+    }
+
+    // Fallback: body.userId
+    if (req.body && req.body.userId) {
+        const parsed = parseInt(req.body.userId, 10);
+        if (!isNaN(parsed)) req.userId = parsed;
+    }
+
     next();
 });
 
@@ -322,7 +336,7 @@ router.get('/orders/:id', (req, res) => {
     res.json(pedido);
 });
 
-// PATCH /api/orders/:id/status — Avançar status
+// PATCH /api/orders/:id/status — Avançar status (admin ou dono do pedido)
 router.patch('/orders/:id/status', (req, res) => {
     if (!req.userId) {
         return res.status(400).json({ error: 'Informe o userId via header X-User-Id' });
@@ -342,6 +356,12 @@ router.patch('/orders/:id/status', (req, res) => {
     if (!pedido) {
         logger.warn(`Falha ao atualizar status: pedido ${req.params.id} não encontrado`, reqCtx(req));
         return res.status(404).json({ error: 'Pedido não encontrado' });
+    }
+
+    // Apenas admin ou dono do pedido pode avançar status
+    if (req.userRole !== 'admin' && parseInt(userKey, 10) !== req.userId) {
+        logger.warn(`Tentativa não autorizada de avançar pedido #${pedido.id} por user ${req.userId}`, reqCtx(req));
+        return res.status(403).json({ error: 'Você não tem permissão para alterar este pedido' });
     }
 
     const currentIdx = ORDER_STATUSES.indexOf(pedido.status);

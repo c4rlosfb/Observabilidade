@@ -3,14 +3,75 @@ const promClient = require('prom-client');
 const path = require('path');
 const { Worker } = require('worker_threads');
 const os = require('os');
+const crypto = require('crypto');
 const { createLogger, requestLoggerMiddleware } = require('./logger');
 
 const app = express();
 const logger = createLogger('app');
 
+// ─── JWT Helpers (crypto nativo, sem dependência extra) ─────────────────────
+const JWT_SECRET = process.env.JWT_SECRET || 'obs-lab-secret-change-in-production';
+const TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 horas
+
+function base64url(buf) { return buf.toString('base64url'); }
+function base64urlDecode(str) { return Buffer.from(str, 'base64url'); }
+
+function generateToken(payload) {
+    const header = base64url(Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));
+    const body = base64url(Buffer.from(JSON.stringify({ ...payload, exp: Date.now() + TOKEN_EXPIRY, iat: Date.now() })));
+    const signature = base64url(crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest());
+    return `${header}.${body}.${signature}`;
+}
+
+function verifyToken(token) {
+    try {
+        const [headerB64, bodyB64, sigB64] = token.split('.');
+        const expectedSig = base64url(crypto.createHmac('sha256', JWT_SECRET).update(`${headerB64}.${bodyB64}`).digest());
+        if (expectedSig !== sigB64) return null;
+        const payload = JSON.parse(base64urlDecode(bodyB64).toString('utf8'));
+        if (payload.exp < Date.now()) return null;
+        return payload;
+    } catch { return null; }
+}
+
 app.use(express.json());
 app.set('json spaces', 2); // Deixa o output do JSON formatado e com quebra de linha no curl
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ─── Middleware de Autenticação JWT ─────────────────────────────────────────
+const authMiddleware = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return next(); // rotas públicas continuam sem autenticação
+    }
+    const token = authHeader.split(' ')[1];
+    const payload = verifyToken(token);
+    if (payload) {
+        req.userId = payload.id;
+        req.userRole = payload.role;
+        req.username = payload.username;
+    }
+    next();
+};
+
+const requireAuth = (req, res, next) => {
+    if (!req.userId) {
+        return res.status(401).json({ error: 'Token de autenticação inválido ou expirado' });
+    }
+    next();
+};
+
+const requireAdmin = (req, res, next) => {
+    if (!req.userId) {
+        return res.status(401).json({ error: 'Autenticação necessária' });
+    }
+    if (req.userRole !== 'admin') {
+        return res.status(403).json({ error: 'Acesso restrito a administradores' });
+    }
+    next();
+};
+
+app.use(authMiddleware);
 
 // ─── Middleware de Log Estruturado ──────────────────────────────────────────
 app.use(requestLoggerMiddleware(logger));
@@ -92,15 +153,16 @@ app.post('/register', (req, res) => {
         });
         return res.status(400).json({ error: 'Dados incompletos' });
     }
-    const user = { id: currentId++, username, password };
+    const role = users.length === 0 ? 'admin' : 'user'; // primeiro usuário é admin
+    const user = { id: currentId++, username, password, role };
     users.push(user);
-    logger.info(`Usuário registrado com sucesso: ${username}`, {
+    logger.info(`Usuário registrado com sucesso: ${username} (${role})`, {
         correlation_id: req.correlationId,
         method: req.method,
         route: req.path,
         user_id: user.id
     });
-    res.status(201).json({ id: user.id, username });
+    res.status(201).json({ id: user.id, username, role: user.role });
 });
 
 app.post('/login', (req, res) => {
@@ -115,13 +177,18 @@ app.post('/login', (req, res) => {
     }
     const user = users.find(u => u.username === username && u.password === password);
     if (user) {
+        const token = generateToken({ id: user.id, username: user.username, role: user.role });
         logger.info(`Login efetuado com sucesso para o usuário: ${username}`, {
             correlation_id: req.correlationId,
             method: req.method,
             route: req.path,
             user_id: user.id
         });
-        res.status(200).json({ message: 'Login efetuado com sucesso' });
+        res.status(200).json({
+            message: 'Login efetuado com sucesso',
+            token,
+            user: { id: user.id, username: user.username, role: user.role }
+        });
     } else {
         logger.error('Login falhou para o usuário: ' + username, {
             correlation_id: req.correlationId,
@@ -132,16 +199,16 @@ app.post('/login', (req, res) => {
     }
 });
 
-app.get('/users', (req, res) => {
+app.get('/users', requireAuth, (req, res) => {
     logger.info('Listando usuários', {
         correlation_id: req.correlationId,
         method: req.method,
         route: req.path
     });
-    res.json(users.map(u => ({ id: u.id, username: u.username })));
+    res.json(users.map(u => ({ id: u.id, username: u.username, role: u.role })));
 });
 
-app.put('/users/:id', (req, res) => {
+app.put('/users/:id', requireAuth, (req, res) => {
     const { id } = req.params;
     const { username, password } = req.body;
     const user = users.find(u => u.id == id);
@@ -165,7 +232,7 @@ app.put('/users/:id', (req, res) => {
     }
 });
 
-app.delete('/users/:id', (req, res) => {
+app.delete('/users/:id', requireAdmin, (req, res) => {
     const { id } = req.params;
     const index = users.findIndex(u => u.id == id);
     if (index !== -1) {
