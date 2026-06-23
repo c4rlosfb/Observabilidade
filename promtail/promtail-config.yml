@@ -19,3 +19,31 @@ scrape_configs:
         target_label: 'container'
       - source_labels: ['__meta_docker_container_id']
         target_label: 'container_id'
+    pipeline_stages:
+      # Parse logs JSON estruturados da aplicação Node.js
+      - json:
+          expressions:
+            timestamp:
+            level:
+            message:
+            correlation_id:
+            service:
+            module:
+            method:
+            route:
+            status_code:
+            duration_ms:
+            user_id:
+            error_stack:
+      # Usa o timestamp do log como timestamp oficial (ISO 8601)
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      # Extrai level como label para filtrar no Loki/Grafana
+      - labels:
+          level:
+          service:
+          module:
+          method:
+          route:
+          correlation_id:
