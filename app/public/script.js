@@ -539,12 +539,32 @@ async function loadOrders() {
                 <div class="order-card-footer">
                     <span>Total:</span>
                     <span class="order-total">R$ ${formatPrice(o.total)}</span>
+                    ${o.status !== 'delivered' ? `<button class="btn-advance" onclick="advanceOrder(${o.id})">▶ Avançar</button>` : ''}
                 </div>
             </div>
         `).join('');
     } catch (_) {
         $('orders-list').classList.add('hidden');
         $('orders-empty').classList.remove('hidden');
+    }
+}
+
+async function advanceOrder(orderId) {
+    try {
+        const res = await fetch(`/api/orders/${orderId}/status`, {
+            method: 'PATCH',
+            headers: apiHeaders()
+        });
+        if (res.ok) {
+            const data = await res.json();
+            showToast(`Pedido #${orderId} → ${translateStatus(data.status)}`, 'success');
+            loadOrders();
+        } else {
+            const err = await res.json();
+            showToast(err.error || 'Erro ao avançar pedido.', 'error');
+        }
+    } catch (_) {
+        showToast('Erro de rede.', 'error');
     }
 }
 

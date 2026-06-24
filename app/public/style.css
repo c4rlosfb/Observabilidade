@@ -1706,3 +1706,21 @@ select.input-group:focus {
         grid-template-columns: 1fr;
     }
 }
+
+/* Botão Avançar Status do Pedido */
+.btn-advance {
+    background: linear-gradient(135deg, var(--neon-green), #00cc88);
+    color: #0a0a0f;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    transition: opacity 0.2s;
+}
+.btn-advance:hover {
+    opacity: 0.85;
+}
